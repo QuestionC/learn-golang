@@ -3,33 +3,14 @@
 // First let's make a blank image
 package main
 
-//import "io"
-import "os"
-import "log"
+// import "io"
+// import "log"
 import "image"
 import "image/color"
-import "image/png"
 import "math"
+import "learn-golang/util"
 
 const width, height = 512, 512
-
-func savePng (img image.Image, fname string) {
-	// Open the file
-	fo,err := os.Create(fname)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer func() {
-		if err = fo.Close(); err != nil {
-			log.Fatal(err)
-		}
-	}()
-
-	// Write the image
-	if err = png.Encode(fo, img); err != nil {
-		log.Fatal(err)
-	}
-}
 
 func main() {
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
@@ -50,5 +31,5 @@ func main() {
 		}
 	}
 
-	savePng (img, "circle.png")
+	util.SavePng (img, "circle.png")
 }
