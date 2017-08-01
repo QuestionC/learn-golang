@@ -7,7 +7,7 @@ import "io/ioutil"
 
 type bitslice struct {
 	data []byte
-	spare_bits int
+	spare_bits int // How many bits of the last byte we are using. Range 1-8
 }
 
 var trace *log.Logger
@@ -30,6 +30,9 @@ func New(val ...int) bitslice {
 	var result bitslice
 	result.data = make([]byte, N)
 	result.spare_bits = len(val) % 8
+	if result.spare_bits == 0 {
+		result.spare_bits = 8
+	}
 
 	var mask byte
 	mask = 1
