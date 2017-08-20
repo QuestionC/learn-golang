@@ -5,7 +5,7 @@ import "log"
 import "io/ioutil"
 //import "os"
 
-type bitslice struct {
+type Bitslice struct {
 	data []byte
 	spare_bits int // How many bits of the last byte we are using. Range 1-8
 }
@@ -16,18 +16,18 @@ func init() {
 	//trace = log.New (os.Stderr, "", log.Ldate|log.Ltime|log.Lshortfile)
 }
 
-func (self bitslice) Len() int {
+func (self Bitslice) Len() int {
 	return len(self.data) * 8 - 8 + self.spare_bits
 }
 
-func (self bitslice) Cap() int {
+func (self Bitslice) Cap() int {
 	return len(self.data) * 8
 }
 
 
-func New(val ...int) bitslice {
+func New(val ...int) Bitslice {
 	N := (len(val) + 7) / 8
-	var result bitslice
+	var result Bitslice
 	result.data = make([]byte, N)
 	result.spare_bits = len(val) % 8
 	if result.spare_bits == 0 {
@@ -53,7 +53,7 @@ func New(val ...int) bitslice {
 	return result
 }
 
-func (self *bitslice) Append(b int) bitslice {
+func (self *Bitslice) Append(b int) Bitslice {
 	trace.Printf("%s.Append(%d)", self, b)
 	result := *self
 	if result.spare_bits == 8 {
@@ -81,7 +81,9 @@ func (self *bitslice) Append(b int) bitslice {
 	return result
 }
 
-func (self bitslice) String() string {
+
+
+func (self Bitslice) String() string {
 	var result string
 	var mask byte
 
