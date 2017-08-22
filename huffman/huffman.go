@@ -4,22 +4,39 @@ package huffman
 
 import (
 	"io"
-	"fmt"
 	"container/heap"
 	"bufio"
+	"log"
+	"encoding/binary"
 )
 
-func BuildHeader(r io.Reader) []int {
-	// Probably faster to use buffered io reader?
+type Char int16
 
+func Char2Byte(convert_me []Char) []byte {
+	result := make([]byte, len(convert_me)*2)
+	for i := 0; i < len(convert_me); i++ {
+		binary.LittleEndian.PutUint16(result[i*2:], uint16(convert_me[i]))
+	}
+	return result
+}
+
+func Byte2Char(convert_me []byte) []Char {
+	result := make([]Char, len(convert_me)/2)
+	for i := 0; i < len(result); i++ {
+		result[i] = Char(binary.LittleEndian.Uint16(convert_me[i*2:]))
+	}
+	return result
+}
+
+func BuildHeader(r io.Reader) []Char {
 	reader := bufio.NewReader(r)
 
-	m := make(map[int]int)
+	m := make(map[Char]int)
 
 	for {
 		v,err := reader.ReadByte()
 
-		m[int(v)] += 1
+		m[Char(v)] += 1
 
 		if err == io.EOF {
 			break
@@ -35,7 +52,7 @@ func BuildHeader(r io.Reader) []int {
 	i := 0
 	for value, weight := range m {
 		myheap[i] = &heapItem {
-			value: []int{value},
+			value: []Char{value},
 			weight: weight,
 		}
 		i++
@@ -47,17 +64,14 @@ func BuildHeader(r io.Reader) []int {
 		item1 := heap.Pop(&myheap).(*heapItem)
 		item2 := myheap[0]
 
-		// fmt.Println(item1, item2)
+		new_value := []Char{-2}
 
-		new_value := []int{0}
 		new_value = append(new_value, item1.value...)
 		new_value = append(new_value, item2.value...)
 
 		myheap[0].value = new_value
 		myheap[0].weight = item1.weight + item2.weight
-		
-		// fmt.Println(myheap[0])
-	
+
 		heap.Fix(&myheap, 0)
 	}
 
@@ -75,7 +89,8 @@ func BuildHeader(r io.Reader) []int {
 }
 
 // Using the provided dict, encode r
-func WriteFile(r io.Reader, dict map[int][]int, ch chan byte) {
+func WriteFile(r io.Reader, dict map[Char][]int, ch chan byte) {
+	log.Println("WriteFile")
 	var next_byte byte
 	var mask byte
 
@@ -91,9 +106,7 @@ func WriteFile(r io.Reader, dict map[int][]int, ch chan byte) {
 			v = -1
 		}
 
-		bits := dict[int(v)]
-
-		fmt.Println(bits)
+		bits := dict[Char(v)]
 
 		for _,bit := range(bits) {
 			if bit == 1 {
@@ -122,7 +135,41 @@ func WriteFile(r io.Reader, dict map[int][]int, ch chan byte) {
 	close(ch)
 }
 
-func ReadFile(r io.Reader, dict map[int][]int, ch chan byte) {
+func ReadFile(r io.Reader, tree Tree, ch chan byte) {
+	mask := byte(0)
+	var next_byte byte
+
+	reader := bufio.NewReader(r)
+
+	node := tree
+
+	for {
+		if mask == 0 {
+			var err error
+			next_byte,err = reader.ReadByte()
+
+			if err != nil {
+				break
+			}
+			mask = 1
+		}
+
+		val := mask & next_byte
+		if val == 0 {
+			node = *node.Left
+		} else {
+			node = *node.Right
+		}
+
+		if node.Value != nil {
+			if *node.Value == -1 {
+				break
+			}
+			ch <- byte(*node.Value)
+			node = tree
+		}
+		mask <<= 1
+	}
 
 	close(ch)
 }
@@ -130,8 +177,8 @@ func ReadFile(r io.Reader, dict map[int][]int, ch chan byte) {
 // Given a bytestring describing the huffman tree, create a dictionary mapping 
 //  bytes to encoding
 // This is needed for writing
-func Header2Dict(convert_me []int) map[int] []int {
-	result := make(map[int] []int)
+func Header2Dict(convert_me []Char) map[Char] []int {
+	result := make(map[Char] []int)
 
 	// Not trivial for loops rely on pointer arithmetic.
 	// Might as well use forever loops in golang.
@@ -142,7 +189,7 @@ func Header2Dict(convert_me []int) map[int] []int {
 		// Branch to the left
 		v := convert_me[i]
 		for {
-			if v != 0 {
+			if v != -2 {
 				break
 			}
 
@@ -174,13 +221,26 @@ func Header2Dict(convert_me []int) map[int] []int {
 
 	return result
 }
+func Header2Tree(convert_me io.Reader) *Tree { var head Tree
 
+	buff := make([]byte, 2)
+	convert_me.Read(buff)
+	curr_char := Char(binary.LittleEndian.Uint16(buff))
+
+	if curr_char == -2 {
+		head.Left= Header2Tree(convert_me)
+		head.Right = Header2Tree(convert_me)
+	} else {
+		head.Value = &curr_char
+	}
+	return &head
+}
 
 ////////
 // Priority queue implementation, based on https://golang.org/pkg/container/heap/#pkg-overview
 
 type heapItem struct {
-	value []int
+	value []Char
 	weight int
 }
 
@@ -211,3 +271,10 @@ func (this *huffmanHeap) Pop() interface{} {
 	return item
 }
 
+///// Tree Type for reverse decoding
+
+type Tree struct {
+	Left *Tree
+	Right *Tree
+	Value *Char
+}
